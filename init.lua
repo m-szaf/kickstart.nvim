@@ -226,13 +226,13 @@ vim.api.nvim_create_autocmd('TermEnter', {
   end,
 })
 
-vim.keymap.set('t', '<ESC>', function()
-  local win = vim.api.nvim_get_current_win()
-  -- Do not close lazygit on escape
-  if not string.find(vim.api.nvim_buf_get_name(0), 'lazygit') then
-    vim.api.nvim_win_close(win, true)
-  end
-end, { desc = 'Terminal Close term in terminal mode' })
+-- vim.keymap.set('t', '<ESC>', function()
+--   local win = vim.api.nvim_get_current_win()
+--   -- Do not close lazygit on escape
+--   if not string.find(vim.api.nvim_buf_get_name(0), 'lazygit') then
+--     vim.api.nvim_win_close(win, true)
+--   end
+-- end, { desc = 'Terminal Close term in terminal mode' })
 
 -- [[ Basic Autocommands ]]
 --  See `:help lua-guide-autocommands`
@@ -414,15 +414,44 @@ require('lazy').setup({
     opts = {},
     config = function()
       require('typescript-tools').setup {
-        tsserver_max_memory = 8192,
-        tsserver_file_preferences = {
-          includeInlayEnumMemberValueHints = true,
-          includeInlayFunctionLikeReturnTypeHints = true,
-          includeInlayFunctionParameterTypeHints = true,
-          includeInlayParameterNameHints = 'all', -- 'none' | 'literals' | 'all';
-          includeInlayParameterNameHintsWhenArgumentMatchesName = true,
-          includeInlayPropertyDeclarationTypeHints = true,
-          includeInlayVariableTypeHints = true,
+        on_init = function(client)
+          client.server_capabilities.documentFormattingProvider = false
+          client.server_capabilities.documentRangeFormattingProvider = false
+
+          local timer = vim.loop.new_timer()
+          timer:start(
+            2000,
+            2000,
+            vim.schedule_wrap(function()
+              local active_clients = vim.lsp.get_active_clients()
+              local lsp_names = {}
+              for _, lsp in pairs(active_clients) do
+                table.insert(lsp_names, lsp.name)
+              end
+
+              print(vim.inspect(lsp_names))
+
+              if not vim.tbl_contains(lsp_names, 'typescript-tools') then
+                vim.notify('tsserver crashed - restarting!', vim.log.levels.WARN)
+                timer:close()
+
+                vim.cmd [[LspStart typescript-tools]]
+              end
+            end)
+          )
+        end,
+        settings = {
+          expose_as_code_action = 'all',
+          tsserver_max_memory = 8192,
+          tsserver_file_preferences = {
+            includeInlayEnumMemberValueHints = true,
+            includeInlayFunctionLikeReturnTypeHints = true,
+            includeInlayFunctionParameterTypeHints = true,
+            includeInlayParameterNameHints = 'all', -- 'none' | 'literals' | 'all';
+            includeInlayParameterNameHintsWhenArgumentMatchesName = true,
+            includeInlayPropertyDeclarationTypeHints = true,
+            includeInlayVariableTypeHints = true,
+          },
         },
       }
     end,
@@ -802,13 +831,13 @@ require('lazy').setup({
         --    https://github.com/pmizio/typescript-tools.nvim
         --
         -- But for many setups, the LSP (`tsserver`) will work just fine
-        -- tsserver = {},
         --
         --
         eslint = {
           settings = {
             workingDirectories = { mode = 'auto' },
           },
+          ---@diagnostic disable-next-line: unused-local
           on_attach = function(client, bufnr)
             vim.api.nvim_create_autocmd('BufWritePre', {
               buffer = bufnr,
@@ -896,8 +925,16 @@ require('lazy').setup({
         --
         -- You can use a sub-list to tell conform to run *until* a formatter
         -- is found.
-        javascript = { { 'prettierd', 'prettier' } },
-        typescript = { { 'prettierd', 'prettier' } },
+        javascript = { 'prettierd', 'prettier', stop_after_first = true },
+        typescript = { 'prettierd', 'prettier', stop_after_first = true },
+        markdown = { 'prettierd', 'prettier', stop_after_first = true },
+      },
+      formatters = {
+        prettierd = {
+          condition = function()
+            return vim.loop.fs_realpath '.prettierrc' ~= nil or vim.loop.fs_realpath '.prettierrc.js' ~= nil
+          end,
+        },
       },
     },
   },
@@ -937,11 +974,13 @@ require('lazy').setup({
       --  into multiple repos for maintenance purposes.
       'hrsh7th/cmp-nvim-lsp',
       'hrsh7th/cmp-path',
+      'onsails/lspkind.nvim',
     },
     config = function()
       -- See `:help cmp`
       local cmp = require 'cmp'
       local luasnip = require 'luasnip'
+      local lspkind = require 'lspkind'
       luasnip.config.setup {}
 
       cmp.setup {
@@ -951,6 +990,41 @@ require('lazy').setup({
           end,
         },
         completion = { completeopt = 'menu,menuone,noinsert' },
+
+        cmp.setup.cmdline({ '/', '?' }, {
+          mapping = cmp.mapping.preset.cmdline(),
+          sources = {
+            { name = 'buffer' },
+          },
+        }),
+
+        -- cmp.setup.cmdline(':', {
+        --   mapping = cmp.mapping.preset.cmdline(),
+        --   sources = cmp.config.sources({
+        --     { name = 'path' },
+        --   }, {
+        --     { name = 'cmdline' },
+        --   }),
+        --   matching = { disallow_symbol_nonprefix_matching = false },
+        -- }),
+
+        formatting = {
+          format = lspkind.cmp_format {
+            mode = 'symbol', -- show only symbol annotations
+            maxwidth = 50, -- prevent the popup from showing more than provided characters (e.g 50 will not show more than 50 characters)
+            -- can also be a function to dynamically calculate max width such as
+            -- maxwidth = function() return math.floor(0.45 * vim.o.columns) end,
+            ellipsis_char = '...', -- when popup menu exceed maxwidth, the truncated part would show ellipsis_char instead (must define maxwidth first)
+            show_labelDetails = true, -- show labelDetails in menu. Disabled by default
+
+            -- The function below will be called before any actual modifications from lspkind
+            -- so that you can provide more controls on popup customization. (See [#30](https://github.com/onsails/lspkind-nvim/pull/30))
+            before = function(entry, vim_item)
+              --  ...
+              return vim_item
+            end,
+          },
+        },
 
         -- For an understanding of why these mappings were
         -- chosen, you will need to read `:help ins-completion`
@@ -973,7 +1047,7 @@ require('lazy').setup({
 
           -- If you prefer more traditional completion keymaps,
           -- you can uncomment the following lines
-          -- ['<CR>'] = cmp.mapping.confirm { select = true },
+          ['<CR>'] = cmp.mapping.confirm { select = true },
           -- ['<Tab>'] = cmp.mapping.select_next_item(),
           -- ['<S-Tab>'] = cmp.mapping.select_prev_item(),
 
@@ -1005,7 +1079,12 @@ require('lazy').setup({
           --    https://github.com/L3MON4D3/LuaSnip?tab=readme-ov-file#keymaps
         },
         sources = {
-          { name = 'nvim_lsp' },
+          {
+            name = 'nvim_lsp',
+            entry_filter = function(entry, ctx)
+              return require('cmp.types').lsp.CompletionItemKind[entry:get_kind()] ~= 'Text'
+            end,
+          },
           { name = 'luasnip' },
           { name = 'path' },
         },
@@ -1051,14 +1130,14 @@ require('lazy').setup({
 
   -- Highlight todo, notes, etc in comments
   { 'folke/todo-comments.nvim', event = 'VimEnter', dependencies = { 'nvim-lua/plenary.nvim' }, opts = { signs = false } },
-  {
-    'ray-x/lsp_signature.nvim',
-    event = 'VeryLazy',
-    opts = {},
-    config = function(_, opts)
-      require('lsp_signature').setup(opts)
-    end,
-  },
+  -- {
+  --   'ray-x/lsp_signature.nvim',
+  --   event = 'VeryLazy',
+  --   opts = {},
+  --   config = function(_, opts)
+  --     require('lsp_signature').setup(opts)
+  --   end,
+  -- },
   { -- Collection of various small independent plugins/modules
     'echasnovski/mini.nvim',
     config = function()
@@ -1075,9 +1154,9 @@ require('lazy').setup({
       -- - saiw) - [S]urround [A]dd [I]nner [W]ord [)]Paren
       -- - sd'   - [S]urround [D]elete [']quotes
       -- - sr)'  - [S]urround [R]eplace [)] [']
-      require('mini.surround').setup()
+      -- require('mini.surround').setup()
 
-      require('mini.completion').setup()
+      -- require('mini.completion').setup()
 
       -- Simple and easy statusline.
       --  You could remove this setup call if you don't like it,
@@ -1160,7 +1239,7 @@ require('lazy').setup({
   --
   require 'kickstart.plugins.debug',
   require 'kickstart.plugins.indent_line',
-  require 'kickstart.plugins.lint',
+  -- require 'kickstart.plugins.lint',
   require 'kickstart.plugins.autopairs',
   require 'kickstart.plugins.neo-tree',
   require 'kickstart.plugins.gitsigns', -- adds gitsigns recommend keymaps
@@ -1202,7 +1281,6 @@ require('lazy').setup({
       },
     },
   },
-
   {
     'github/copilot.vim',
   },
