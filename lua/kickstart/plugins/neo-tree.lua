@@ -3,6 +3,7 @@
 
 return {
   'nvim-neo-tree/neo-tree.nvim',
+  lazy = false,
   version = '*',
   dependencies = {
     'nvim-lua/plenary.nvim',
@@ -19,8 +20,21 @@ return {
         enabled = true,
       },
       window = {
+        position = 'right',
         mappings = {
           ['\\'] = 'close_window',
+        },
+      },
+      filesystem = {
+        filtered_items = {
+          hide_dotfiles = false,
+          hide_by_name = {
+            '.git',
+            '.DS_Store',
+          },
+          always_show = {
+            '.env',
+          },
         },
       },
     },

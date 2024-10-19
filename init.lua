@@ -8,7 +8,6 @@
 ========         |.-""""""""""""""""""-.|   |-----|          ========
 ========         ||                    ||   | === |          ========
 ========         ||   KICKSTART.NVIM   ||   |-----|          ========
-========         ||                    ||   | === |          ========
 ========         ||                    ||   |-----|          ========
 ========         ||:Tutor              ||   |:::::|          ========
 ========         |'-..................-'|   |____o|          ========
@@ -166,6 +165,9 @@ vim.opt.swapfile = false
 --
 vim.keymap.set('n', '<C-d>', '<C-d>zz')
 vim.keymap.set('n', '<C-u>', '<C-u>zz')
+vim.keymap.set('n', 'n', 'nzzzv')
+vim.keymap.set('n', 'N', 'Nzzzv')
+vim.keymap.set('n', 'Q', '<nop>')
 
 -- Automatically read file if changed outside of Neovim (git, linting, snapshots, etc)
 vim.o.autoread = true
@@ -205,8 +207,8 @@ vim.keymap.set('n', '<C-j>', '<C-w><C-j>', { desc = 'Move focus to the lower win
 vim.keymap.set('n', '<C-k>', '<C-w><C-k>', { desc = 'Move focus to the upper window' })
 
 -- Alt H for cprev and Alt L for cnext
-vim.keymap.set('n', '<M-h>', ':cprev<CR>', { desc = 'Go to [P]revious change' })
-vim.keymap.set('n', '<M-l>', ':cnext<CR>', { desc = 'Go to [N]ext change' })
+vim.keymap.set('n', '<M-h>', ':cprev<CR>zz', { desc = 'Go to [P]revious change' })
+vim.keymap.set('n', '<M-l>', ':cnext<CR>zz', { desc = 'Go to [N]ext change' })
 
 -- Alt J for moving the current line down and Alt K for moving the current line up
 vim.keymap.set('n', '<M-j>', ':m .+1<CR>==', { desc = 'Move the current line [D]own' })
@@ -225,6 +227,9 @@ vim.api.nvim_create_autocmd('TermEnter', {
     end, { buffer = true })
   end,
 })
+
+-- fix tab not working for auto complete in command mode
+vim.keymap.set('c', '<tab>', '<C-z>', { silent = false })
 
 -- vim.keymap.set('t', '<ESC>', function()
 --   local win = vim.api.nvim_get_current_win()
@@ -322,8 +327,14 @@ require('lazy').setup({
     'nvim-treesitter/nvim-treesitter-context',
     config = function()
       require('treesitter-context').setup {
-        max_lines = 6,
+        max_lines = 12,
       }
+    end,
+  },
+  {
+    'mbbill/undotree',
+    config = function()
+      vim.keymap.set('n', '<leader>u', vim.cmd.UndotreeToggle)
     end,
   },
   {
@@ -421,26 +432,48 @@ require('lazy').setup({
           client.server_capabilities.documentFormattingProvider = false
           client.server_capabilities.documentRangeFormattingProvider = false
 
+          _G.ts_tools_instance_count = _G.ts_tools_instance_count or 0
           local timer = vim.loop.new_timer()
           timer:start(
             2000,
             2000,
+
             vim.schedule_wrap(function()
               local active_clients = vim.lsp.get_active_clients()
-              local lsp_names = {}
+              local current_ts_tools_count = 0
+
               for _, lsp in pairs(active_clients) do
-                table.insert(lsp_names, lsp.name)
+                if lsp.name == 'typescript-tools' then
+                  current_ts_tools_count = current_ts_tools_count + 1
+                end
               end
 
-              print(vim.inspect(lsp_names))
-
-              if not vim.tbl_contains(lsp_names, 'typescript-tools') then
-                vim.notify('tsserver crashed - restarting!', vim.log.levels.WARN)
+              -- Check if the count has decreased
+              if current_ts_tools_count < _G.ts_tools_instance_count then
+                vim.notify('typescript-tools crashed - restarting!', vim.log.levels.WARN)
                 timer:close()
-
                 vim.cmd [[LspStart typescript-tools]]
               end
+
+              -- Update the global variable with the current count
+              _G.ts_tools_instance_count = current_ts_tools_count
             end)
+            -- vim.schedule_wrap(function()
+            --   local active_clients = vim.lsp.get_active_clients()
+            --   local lsp_names = {}
+            --   for _, lsp in pairs(active_clients) do
+            --     table.insert(lsp_names, lsp.name)
+            --   end
+            --
+            --   -- print(vim.inspect(lsp_names))
+            --
+            --   if not vim.tbl_contains(lsp_names, 'typescript-tools') then
+            --     vim.notify('tsserver crashed - restarting!', vim.log.levels.WARN)
+            --     timer:close()
+            --
+            --     vim.cmd [[LspStart typescript-tools]]
+            --   end
+            -- end)
           )
         end,
         settings = {
@@ -508,14 +541,14 @@ require('lazy').setup({
         { '<leader>s', group = '[S]earch' },
         { '<leader>w', group = '[W]orkspace' },
         { '<leader>t', group = '[T]oggle' },
-        { '<leader>h', group = 'Git [H]unk', mode = { 'n', 'v' } },
+        -- { '<leader>h', group = 'Git [H]unk', mode = { 'n', 'v' } },
       },
     },
   },
 
   -- NOTE: Plugins can specify dependencies.
   --
-  -- The dependencies are proper plugin specifications as well - anything
+  -- The dependencies are proper plugin specifications as well - nything
   -- you do for a plugin at the top level, you can do for a dependency.
   --
   -- Use the `dependencies` key to specify the dependencies of a particular plugin
@@ -593,6 +626,9 @@ require('lazy').setup({
             prompt_position = 'bottom',
             height = 0.95,
           },
+          preview = {
+            filesize_limit = 0.1, -- MB
+          },
         },
         pickers = {
           oldfiles = {
@@ -604,6 +640,12 @@ require('lazy').setup({
           ['ui-select'] = {
             require('telescope.themes').get_dropdown(),
           },
+          fzf = {
+            fuzzy = true, -- false will only do exact matching
+            override_generic_sorter = true, -- override the generic sorter
+            override_file_sorter = true, -- override the file sorter
+            case_mode = 'smart_case', -- or "ignore_case" or "respect_case"
+          },
         },
       }
 
@@ -612,11 +654,29 @@ require('lazy').setup({
       pcall(require('telescope').load_extension, 'ui-select')
       pcall(require('telescope').load_extension, 'live_grep_args')
 
+      -- make git_files smarter
+      local function smart_git_files()
+        local is_inside_work_tree = {}
+        local opts = {} -- define here if you want to define something
+
+        local cwd = vim.fn.getcwd()
+        if is_inside_work_tree[cwd] == nil then
+          vim.fn.system 'git rev-parse --is-inside-work-tree'
+          is_inside_work_tree[cwd] = vim.v.shell_error == 0
+        end
+
+        if is_inside_work_tree[cwd] then
+          require('telescope.builtin').git_files(opts)
+        else
+          require('telescope.builtin').find_files(opts)
+        end
+      end
+
       -- See `:help telescope.builtin`
       local builtin = require 'telescope.builtin'
       vim.keymap.set('n', '<leader>sh', builtin.help_tags, { desc = '[S]earch [H]elp' })
       vim.keymap.set('n', '<leader>sk', builtin.keymaps, { desc = '[S]earch [K]eymaps' })
-      vim.keymap.set('n', '<leader>ff', builtin.find_files, { desc = '[S]earch [F]iles' })
+      vim.keymap.set('n', '<leader>ff', smart_git_files, { desc = '[S]earch [F]iles' })
       vim.keymap.set('n', '<leader>fs', builtin.builtin, { desc = '[S]earch [S]elect Telescope' })
       vim.keymap.set('n', '<leader>fw', builtin.grep_string, { desc = '[S]earch current [W]ord' })
       vim.keymap.set('n', '<leader>fg', ":lua require('telescope').extensions.live_grep_args.live_grep_args()<CR>", { desc = '[S]earch by [G]rep' })
@@ -885,7 +945,7 @@ require('lazy').setup({
           ---@diagnostic disable-next-line: unused-local
           on_attach = function(client, bufnr)
             vim.api.nvim_create_autocmd('BufWritePre', {
-              buffer = bufnr,
+              pattern = { '*.tsx', '*.ts', '*.jsx', '*.js', '*.json' },
               command = 'EslintFixAll',
             })
           end,
@@ -966,7 +1026,7 @@ require('lazy').setup({
           lsp_format_opt = 'fallback'
         end
         return {
-          timeout_ms = 500,
+          timeout_ms = 2000,
           lsp_format = lsp_format_opt,
         }
       end,
@@ -1213,20 +1273,55 @@ require('lazy').setup({
       -- Simple and easy statusline.
       --  You could remove this setup call if you don't like it,
       --  and try some other statusline plugin
-      local statusline = require 'mini.statusline'
+      -- local statusline = require 'mini.statusline'
       -- set use_icons to true if you have a Nerd Font
-      statusline.setup { use_icons = vim.g.have_nerd_font }
+      -- statusline.setup { use_icons = vim.g.have_nerd_font }
 
       -- You can configure sections in the statusline by overriding their
       -- default behavior. For example, here we set the section for
       -- cursor location to LINE:COLUMN
-      ---@diagnostic disable-next-line: duplicate-set-field
-      statusline.section_location = function()
-        return '%2l:%-2v'
-      end
+      -- @diagnostic disable-next-line: duplicate-set-field
+      -- statusline.section_location = function()
+      -- return '%2l:%-2v'
+      -- end
 
       -- ... and there is more!
       --  Check out: https://github.com/echasnovski/mini.nvim
+    end,
+  },
+  {
+    'folke/noice.nvim',
+    event = 'VeryLazy',
+    opts = {
+      -- add any options here
+    },
+    dependencies = {
+      -- if you lazy-load any plugin below, make sure to add proper `module="..."` entries
+      'MunifTanjim/nui.nvim',
+      -- OPTIONAL:
+      --   `nvim-notify` is only needed, if you want to use the notification view.
+      --   If not available, we use `mini` as the fallback
+      'rcarriga/nvim-notify',
+    },
+    config = function()
+      require('noice').setup {
+        lsp = {
+          -- override markdown rendering so that **cmp** and other plugins use **Treesitter**
+          override = {
+            ['vim.lsp.util.convert_input_to_markdown_lines'] = true,
+            ['vim.lsp.util.stylize_markdown'] = true,
+            ['cmp.entry.get_documentation'] = true, -- requires hrsh7th/nvim-cmp
+          },
+        },
+        -- you can enable a preset for easier configuration
+        presets = {
+          bottom_search = true, -- use a classic bottom cmdline for search
+          command_palette = true, -- position the cmdline and popupmenu together
+          long_message_to_split = true, -- long messages will be sent to a split
+          inc_rename = false, -- enables an input dialog for inc-rename.nvim
+          lsp_doc_border = false, -- add a border to hover docs and signature help
+        },
+      }
     end,
   },
   { -- Highlight, edit, and navigate code
@@ -1234,16 +1329,36 @@ require('lazy').setup({
     build = ':TSUpdate',
     main = 'nvim-treesitter.configs', -- Sets main module to use for opts
     -- [[ Configure Treesitter ]] See `:help nvim-treesitter`
+    dependencies = {
+      'nvim-treesitter/nvim-treesitter-textobjects',
+    },
     opts = {
       ensure_installed = { 'bash', 'c', 'diff', 'html', 'lua', 'luadoc', 'markdown', 'vim', 'vimdoc', 'typescript', 'javascript', 'json', 'yaml', 'python' },
       -- Autoinstall languages that are not installed
       auto_install = true,
+      sync_install = true,
+      ignore_install = { 'javascript' },
+
       highlight = {
         enable = true,
-        -- Some languages depend on vim's regex highlighting system (such as Ruby) for indent rules.
-        --  If you are experiencing weird indenting issues, add the language to
-        --  the list of additional_vim_regex_highlighting and disabled languages for indent.
-        additional_vim_regex_highlighting = { 'ruby' },
+        -- NOTE: these are the names of the parsers and not the filetype. (for example if you want to
+        -- disable highlighting for the `tex` filetype, you need to include `latex` in this list as this is
+        -- the name of the parser)
+        -- list of language that will be disabled
+        -- Or use a function for more flexibility, e.g. to disable slow treesitter highlight for large files
+        disable = function(lang, buf)
+          local max_filesize = 100 * 1024 -- 100 KB
+          local ok, stats = pcall(vim.loop.fs_stat, vim.api.nvim_buf_get_name(buf))
+          if ok and stats and stats.size > max_filesize then
+            return true
+          end
+        end,
+
+        -- Setting this to true will run `:h syntax` and tree-sitter at the same time.
+        -- Set this to `true` if you depend on 'syntax' being enabled (like for indentation).
+        -- Using this option may slow down your editor, and you may see some duplicate highlights.
+        -- Instead of true it can also be a list of languages
+        additional_vim_regex_highlighting = false,
       },
       indent = { enable = false, disable = { 'ruby' } },
       incremental_selection = {
@@ -1255,15 +1370,32 @@ require('lazy').setup({
           node_decremental = '<bs>',
         },
       },
-      -- textobjects = {
-      --   move = {
-      --     enable = true,
-      --     goto_next_start = { [']f'] = '@function.outer', [']c'] = '@class.outer', [']a'] = '@parameter.inner' },
-      --     goto_next_end = { [']F'] = '@function.outer', [']C'] = '@class.outer', [']A'] = '@parameter.inner' },
-      --     goto_previous_start = { ['[f'] = '@function.outer', ['[c'] = '@class.outer', ['[a'] = '@parameter.inner' },
-      --     goto_previous_end = { ['[F'] = '@function.outer', ['[C'] = '@class.outer', ['[A'] = '@parameter.inner' },
-      --   },
-      -- },
+      textobjects = {
+        -- select = { -- use S for flash with treesitter
+        --   enable = true,
+        --   keymaps = {
+        --     ['af'] = '@function.outer',
+        --     ['if'] = '@function.inner',
+        --     ['ac'] = '@class.outer',
+        --     ['ic'] = '@class.inner',
+        --     ['ap'] = '@parameter.outer',
+        --     ['ip'] = '@parameter.inner',
+        --   },
+        -- },
+        -- swap = {
+        --   enable = true,
+        --   swap_next = { ['<leader>a'] = '@parameter.inner' }, -- will confict with harpoon
+        --   swap_previous = { ['<leader>A'] = '@parameter.inner' },
+        -- },
+        move = {
+          enable = true,
+          set_jumps = true, -- whether to set jumps in the jumplist
+          goto_next_start = { [']f'] = '@function.outer', [']a'] = '@parameter.inner' },
+          goto_next_end = { [']F'] = '@function.outer', [']A'] = '@parameter.inner' },
+          goto_previous_start = { ['[f'] = '@function.outer', ['[a'] = '@parameter.inner' },
+          goto_previous_end = { ['[F'] = '@function.outer', ['[A'] = '@parameter.inner' },
+        },
+      },
     },
     -- There are additional nvim-treesitter modules that you can use to interact
     -- with nvim-treesitter. You should go explore a few and see what interests you:
@@ -1288,6 +1420,7 @@ require('lazy').setup({
   require 'kickstart.plugins.autopairs',
   require 'kickstart.plugins.neo-tree',
   require 'kickstart.plugins.gitsigns', -- adds gitsigns recommend keymaps
+  require 'kickstart.plugins.lualine',
 
   {
     'folke/trouble.nvim',
@@ -1487,23 +1620,23 @@ require('lazy').setup({
 
       vim.keymap.set('n', '<leader>a', function()
         harpoon:list():add()
-      end)
+      end, { desc = 'Add Harpoon Mark' })
       vim.keymap.set('n', '<leader>e', function()
         harpoon.ui:toggle_quick_menu(harpoon:list())
-      end)
+      end, { desc = 'Toggle Harpoon Quick Menu' })
 
       vim.keymap.set('n', '<leader>h', function()
         harpoon:list():select(1)
-      end)
+      end, { desc = 'Select Harpoon Mark 1' })
       vim.keymap.set('n', '<leader>j', function()
         harpoon:list():select(2)
-      end)
+      end, { desc = 'Select Harpoon Mark 2' })
       vim.keymap.set('n', '<leader>k', function()
         harpoon:list():select(3)
-      end)
+      end, { desc = 'Select Harpoon Mark 3' })
       vim.keymap.set('n', '<leader>l', function()
         harpoon:list():select(4)
-      end)
+      end, { desc = 'Select Harpoon Mark 4' })
     end,
   },
 
@@ -1513,6 +1646,16 @@ require('lazy').setup({
   --  Uncomment the following line and add your plugins to `lua/custom/plugins/*.lua` to get going.
   --    For additional information, see `:help lazy.nvim-lazy.nvim-structuring-your-plugins`
   -- { import = 'custom.plugins' },
+  { 'arkav/lualine-lsp-progress' },
+  {
+    'letieu/harpoon-lualine',
+    dependencies = {
+      {
+        'ThePrimeagen/harpoon',
+        branch = 'harpoon2',
+      },
+    },
+  },
 }, {
   ui = {
     -- If you are using a Nerd Font: set icons to an empty table which will use the
@@ -1535,6 +1678,8 @@ require('lazy').setup({
   },
 })
 
+-- require('lazyvim.config').init()
+-- require('lazyvim.config').setup {}
 -- The line beneath this is called `modeline`. See `:help modeline`
 -- vim: ts=2 sts=2 sw=2 et
 --
