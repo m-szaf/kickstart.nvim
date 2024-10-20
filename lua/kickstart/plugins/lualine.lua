@@ -14,6 +14,19 @@ return {
     local lualine_require = require 'lualine_require'
     lualine_require.require = require
 
+    local function custom_filename()
+      local filetype = vim.bo.filetype
+      local excluded_filetypes = { 'neo-tree', 'NvimTree', 'startify', 'dashboard' }
+
+      for _, ft in ipairs(excluded_filetypes) do
+        if filetype == ft then
+          return ''
+        end
+      end
+
+      return vim.fn.expand '%:t'
+    end
+
     vim.o.laststatus = vim.g.lualine_laststatus
     local opts = {
       options = {
@@ -39,38 +52,46 @@ return {
           'neo-tree',
         },
       },
+      tabline = {
+        lualine_b = {
+          { custom_filename, file_status = true, path = 4, shorting_target = 30 },
+        },
+        lualine_c = {
+          { 'filetype', icon_only = true, separator = '', padding = { left = 1, right = 0 } },
+        },
+        lualine_y = { 'branch' },
+      },
       sections = {
         lualine_a = { 'mode' },
-        lualine_b = { 'branch' },
-
+        lualine_b = {},
         lualine_c = {
-          { 'filename', file_status = true, path = 1 },
           {
             'diagnostics',
           },
-          { 'filetype', icon_only = true, separator = '', padding = { left = 1, right = 0 } },
         },
         lualine_x = {
           {
             'lsp_progress',
-            display_components = { 'lsp_client_name', { 'percentage', 'message' } },
-            separators = {
-              message = { pre = '(', post = ')' },
-              percentage = { pre = '', post = '%% ' },
-              lsp_client_name = { pre = '[', post = ']' },
+            display_components = { 'lsp_client_name', 'spinner' },
+            colors = {
+              spinner = '#f38ba8',
+              lsp_client_name = '#a6e3a1',
+              use = true,
             },
-            message = { commenced = 'Indexing...', completed = 'Done!' },
+            -- message = { commenced = '', completed = '' },
+            timer = { progress_enddelay = 500, spinner = 250, lsp_client_name_enddelay = 0 },
+            spinner_symbols = { '⣾', '⣽', '⣻', '⢿', '⡿', '⣟', '⣯', '⣷' },
           },
           -- stylua: ignore
-          {
-            function() return require("noice").api.status.command.get() end,
-            cond = function() return package.loaded["noice"] and require("noice").api.status.command.has() end,
-          },
+          -- {
+          --   function() return require("noice").api.status.command.get() end,
+          --   cond = function() return package.loaded["noice"] and require("noice").api.status.command.has() end,
+          -- },
           -- stylua: ignore
-          {
-            function() return require("noice").api.status.mode.get() end,
-            cond = function() return package.loaded["noice"] and require("noice").api.status.mode.has() end,
-          },
+          -- {
+          --   function() return require("noice").api.status.mode.get() end,
+          --   cond = function() return package.loaded["noice"] and require("noice").api.status.mode.has() end,
+          -- },
           -- stylua: ignore
           {
             function() return "  " .. require("dap").status() end,
@@ -97,8 +118,6 @@ return {
           },
         },
         lualine_y = {
-          -- 'lsp_progress',
-          -- { 'progress', separator = ' ', padding = { left = 1, right = 0 } },
           {
             'harpoon2',
             icon = '󰀱',
@@ -110,6 +129,7 @@ return {
           },
         },
         lualine_z = {
+          { 'progress', separator = ' ', padding = { left = 1, right = 0 } },
           { 'location', padding = { left = 0, right = 1 } },
           -- function()
           --   return ' ' .. os.date '%R'
@@ -121,21 +141,21 @@ return {
 
     -- do not add trouble symbols if aerial is enabled
     -- And allow it to be overriden for some buffer types (see autocmds)
-    -- local trouble = require 'trouble'
-    -- local symbols = trouble.statusline {
-    --   mode = 'symbols',
-    --   groups = {},
-    --   title = false,
-    --   filter = { range = true },
-    --   format = '{kind_icon}{symbol.name:Normal}',
-    --   hl_group = 'lualine_c_normal',
-    -- }
-    -- table.insert(opts.sections.lualine_c, {
-    --   symbols and symbols.get,
-    --   cond = function()
-    --     return vim.b.trouble_lualine ~= false and symbols.has()
-    --   end,
-    -- })
+    local trouble = require 'trouble'
+    local symbols = trouble.statusline {
+      mode = 'symbols',
+      groups = {},
+      title = false,
+      filter = { range = true },
+      format = '{kind_icon}{symbol.name:Normal}',
+      hl_group = 'lualine_c_normal',
+    }
+    table.insert(opts.sections.lualine_c, {
+      symbols and symbols.get,
+      cond = function()
+        return vim.b.trouble_lualine ~= false and symbols.has()
+      end,
+    })
 
     return opts
   end,

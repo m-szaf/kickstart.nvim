@@ -407,6 +407,39 @@ require('lazy').setup({
       { "<c-s>", mode = { "c" },           function() require("flash").toggle() end,            desc = "Toggle Flash Search" },
     },
   },
+  {
+    'yioneko/nvim-vtsls',
+    ft = { 'javascript', 'javascriptreact', 'javascript.jsx', 'typescript', 'typescriptreact', 'typescript.tsx' },
+    config = function()
+      require('vtsls').config {
+        -- customize handlers for commands
+        -- handlers = {
+        --   source_definition = function(err, locations) end,
+        --   file_references = function(err, locations) end,
+        --   code_action = function(err, actions) end,
+        -- },
+        -- automatically trigger renaming of extracted symbol
+        refactor_auto_rename = true,
+        -- refactor_move_to_file = {
+        --   -- If dressing.nvim is installed, telescope will be used for selection prompt. Use this to customize
+        --   -- the opts for telescope picker.
+        --   telescope_opts = function(items, default) end,
+        -- },
+      }
+
+      -- Opens trouble instead of qflist when multiple source definitions
+      -- vim.api.nvim_create_autocmd('BufRead', {
+      --   callback = function(ev)
+      --     if vim.bo[ev.buf].buftype == 'quickfix' then
+      --       vim.schedule(function()
+      --         vim.cmd [[cclose]]
+      --         vim.cmd [[Trouble qflist open]]
+      --       end)
+      --     end
+      --   end,
+      -- })
+    end,
+  },
 
   -- NOTE: Plugins can also be configured to run Lua code when they are loaded.
   --
@@ -422,76 +455,76 @@ require('lazy').setup({
   -- Then, because we use the `config` key, the configuration only runs
   -- after the plugin has been loaded:
   --  config = function() ... end
-  {
-    'pmizio/typescript-tools.nvim',
-    dependencies = { 'nvim-lua/plenary.nvim', 'neovim/nvim-lspconfig' },
-    opts = {},
-    config = function()
-      require('typescript-tools').setup {
-        on_init = function(client)
-          client.server_capabilities.documentFormattingProvider = false
-          client.server_capabilities.documentRangeFormattingProvider = false
-
-          _G.ts_tools_instance_count = _G.ts_tools_instance_count or 0
-          local timer = vim.loop.new_timer()
-          timer:start(
-            2000,
-            2000,
-
-            vim.schedule_wrap(function()
-              local active_clients = vim.lsp.get_active_clients()
-              local current_ts_tools_count = 0
-
-              for _, lsp in pairs(active_clients) do
-                if lsp.name == 'typescript-tools' then
-                  current_ts_tools_count = current_ts_tools_count + 1
-                end
-              end
-
-              -- Check if the count has decreased
-              if current_ts_tools_count < _G.ts_tools_instance_count then
-                vim.notify('typescript-tools crashed - restarting!', vim.log.levels.WARN)
-                timer:close()
-                vim.cmd [[LspStart typescript-tools]]
-              end
-
-              -- Update the global variable with the current count
-              _G.ts_tools_instance_count = current_ts_tools_count
-            end)
-            -- vim.schedule_wrap(function()
-            --   local active_clients = vim.lsp.get_active_clients()
-            --   local lsp_names = {}
-            --   for _, lsp in pairs(active_clients) do
-            --     table.insert(lsp_names, lsp.name)
-            --   end
-            --
-            --   -- print(vim.inspect(lsp_names))
-            --
-            --   if not vim.tbl_contains(lsp_names, 'typescript-tools') then
-            --     vim.notify('tsserver crashed - restarting!', vim.log.levels.WARN)
-            --     timer:close()
-            --
-            --     vim.cmd [[LspStart typescript-tools]]
-            --   end
-            -- end)
-          )
-        end,
-        settings = {
-          expose_as_code_action = 'all',
-          tsserver_max_memory = 8192,
-          tsserver_file_preferences = {
-            includeInlayEnumMemberValueHints = true,
-            includeInlayFunctionLikeReturnTypeHints = true,
-            includeInlayFunctionParameterTypeHints = true,
-            includeInlayParameterNameHints = 'all', -- 'none' | 'literals' | 'all';
-            includeInlayParameterNameHintsWhenArgumentMatchesName = true,
-            includeInlayPropertyDeclarationTypeHints = true,
-            includeInlayVariableTypeHints = true,
-          },
-        },
-      }
-    end,
-  },
+  -- {
+  --   'pmizio/typescript-tools.nvim',
+  --   dependencies = { 'nvim-lua/plenary.nvim', 'neovim/nvim-lspconfig' },
+  --   opts = {},
+  --   config = function()
+  --     require('typescript-tools').setup {
+  --       on_init = function(client)
+  --         client.server_capabilities.documentFormattingProvider = false
+  --         client.server_capabilities.documentRangeFormattingProvider = false
+  --
+  --         _G.ts_tools_instance_count = _G.ts_tools_instance_count or 0
+  --         local timer = vim.loop.new_timer()
+  --         timer:start(
+  --           2000,
+  --           2000,
+  --
+  --           vim.schedule_wrap(function()
+  --             local active_clients = vim.lsp.get_active_clients()
+  --             local current_ts_tools_count = 0
+  --
+  --             for _, lsp in pairs(active_clients) do
+  --               if lsp.name == 'typescript-tools' then
+  --                 current_ts_tools_count = current_ts_tools_count + 1
+  --               end
+  --             end
+  --
+  --             -- Check if the count has decreased
+  --             if current_ts_tools_count < _G.ts_tools_instance_count then
+  --               vim.notify('typescript-tools crashed - restarting!', vim.log.levels.WARN)
+  --               timer:close()
+  --               vim.cmd [[LspStart typescript-tools]]
+  --             end
+  --
+  --             -- Update the global variable with the current count
+  --             _G.ts_tools_instance_count = current_ts_tools_count
+  --           end)
+  --           -- vim.schedule_wrap(function()
+  --           --   local active_clients = vim.lsp.get_active_clients()
+  --           --   local lsp_names = {}
+  --           --   for _, lsp in pairs(active_clients) do
+  --           --     table.insert(lsp_names, lsp.name)
+  --           --   end
+  --           --
+  --           --   -- print(vim.inspect(lsp_names))
+  --           --
+  --           --   if not vim.tbl_contains(lsp_names, 'typescript-tools') then
+  --           --     vim.notify('tsserver crashed - restarting!', vim.log.levels.WARN)
+  --           --     timer:close()
+  --           --
+  --           --     vim.cmd [[LspStart typescript-tools]]
+  --           --   end
+  --           -- end)
+  --         )
+  --       end,
+  --       settings = {
+  --         expose_as_code_action = 'all',
+  --         tsserver_max_memory = 8192,
+  --         tsserver_file_preferences = {
+  --           includeInlayEnumMemberValueHints = true,
+  --           includeInlayFunctionLikeReturnTypeHints = true,
+  --           includeInlayFunctionParameterTypeHints = true,
+  --           includeInlayParameterNameHints = 'all', -- 'none' | 'literals' | 'all';
+  --           includeInlayParameterNameHintsWhenArgumentMatchesName = true,
+  --           includeInlayPropertyDeclarationTypeHints = true,
+  --           includeInlayVariableTypeHints = true,
+  --         },
+  --       },
+  --     }
+  --   end,
+  -- },
   { -- Useful plugin to show you pending keybinds.
     'folke/which-key.nvim',
     event = 'VimEnter', -- Sets the loading event to 'VimEnter'
@@ -916,6 +949,8 @@ require('lazy').setup({
       local capabilities = vim.lsp.protocol.make_client_capabilities()
       capabilities = vim.tbl_deep_extend('force', capabilities, require('cmp_nvim_lsp').default_capabilities())
 
+      require('lspconfig.configs').vtsls = require('vtsls').lspconfig
+
       -- Enable the following language servers
       --  Feel free to add/remove any LSPs that you want here. They will automatically be installed.
       --
@@ -938,6 +973,89 @@ require('lazy').setup({
         -- But for many setups, the LSP (`tsserver`) will work just fine
         --
         --
+        tsserver = {
+          enabled = false,
+        },
+        -- ts_ls = {
+        --   enabled = false,
+        -- },
+        vtsls = {
+          cmd = { 'vtsls', '--stdio' },
+          filetypes = {
+            'javascript',
+            'typescript',
+          },
+          -- root_dir = function(fname)
+          --   return require('lspconfig.util').root_pattern('tsconfig.json', 'jsconfig.json')(fname)
+          --     or require('lspconfig.util').root_pattern('package.json', '.git')(fname)
+          -- end,
+          single_file_support = true,
+          settings = {
+            complete_function_calls = true,
+            vtsls = {
+              enableMoveToFileCodeAction = true,
+              autoUseWorkspaceTsdk = true,
+              experimental = {
+                completion = {
+                  enableServerSideFuzzyMatch = true,
+                  entriesLimit = 50,
+                },
+              },
+            },
+            typescript = {
+              tsserver = {
+                maxTsServerMemory = 16384,
+                -- experimental = { -- DOES WILD THINGS - walks dirs/spams errors, keep off
+                --   enableProjectDiagnostics = true,
+                -- },
+              },
+              preferences = {
+                includePackageJsonAutoImports = 'off',
+              },
+              workspaceSymbols = {
+                excludeLibrarySymbols = true,
+              },
+              updateImportsOnFileMove = { enabled = 'always' },
+              suggest = {
+                completeFunctionCalls = true,
+              },
+              referencesCodeLens = {
+                enabled = false,
+                showOnAllFunctions = true,
+              },
+              implementationsCodeLens = {
+                enabled = false,
+                showOnInterfaceMethods = true,
+              },
+              inlayHints = {
+                enumMemberValues = { enabled = true },
+                functionLikeReturnTypes = { enabled = true },
+                parameterNames = { enabled = 'literals' },
+                parameterTypes = { enabled = true },
+                propertyDeclarationTypes = { enabled = true },
+                variableTypes = { enabled = false },
+              },
+            },
+            javascript = {
+              updateImportsOnFileMove = { enabled = 'always' },
+              suggest = {
+                completeFunctionCalls = true,
+              },
+              inlayHints = {
+                enumMemberValues = { enabled = true },
+                functionLikeReturnTypes = { enabled = true },
+                parameterNames = { enabled = 'literals' },
+                parameterTypes = { enabled = true },
+                propertyDeclarationTypes = { enabled = true },
+                variableTypes = { enabled = false },
+              },
+            },
+          },
+          on_attach = function(client, _)
+            client.server_capabilities.documentFormattingProvider = false
+            client.server_capabilities.documentRangeFormattingProvider = false
+          end,
+        },
         eslint = {
           settings = {
             workingDirectories = { mode = 'auto' },
@@ -1292,9 +1410,7 @@ require('lazy').setup({
   {
     'folke/noice.nvim',
     event = 'VeryLazy',
-    opts = {
-      -- add any options here
-    },
+    opts = {},
     dependencies = {
       -- if you lazy-load any plugin below, make sure to add proper `module="..."` entries
       'MunifTanjim/nui.nvim',
@@ -1305,6 +1421,20 @@ require('lazy').setup({
     },
     config = function()
       require('noice').setup {
+        routes = {
+          {
+            filter = {
+              event = 'notify',
+              find = 'Request textDocument/inlayHint failed',
+            },
+            opts = { skip = true },
+          },
+        },
+        views = {
+          notify = {
+            replace = true,
+          },
+        },
         lsp = {
           -- override markdown rendering so that **cmp** and other plugins use **Treesitter**
           override = {

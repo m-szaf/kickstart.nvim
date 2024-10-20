@@ -23,6 +23,8 @@ return {
         position = 'right',
         mappings = {
           ['\\'] = 'close_window',
+          ['s'] = 'noop',
+          ['S'] = 'open_vsplit',
         },
       },
       filesystem = {
