@@ -7,8 +7,8 @@ return {
       local lint = require 'lint'
       lint.linters_by_ft = {
         markdown = { 'markdownlint-cli2' },
-        -- typescript = { 'eslint_d' },
-        -- javascript = { 'eslint_d' },
+        typescript = { 'eslint_d' },
+        javascript = { 'eslint_d' },
       }
 
       -- To allow other plugins to add linters to require('lint').linters_by_ft,
@@ -53,6 +53,17 @@ return {
           -- vim.lsp.buf.format()
         end,
       })
+
+      vim.lsp.handlers['textDocument/publishDiagnostics'] = vim.lsp.with(vim.lsp.diagnostic.on_publish_diagnostics, {
+        underline = true,
+        virtual_text = false,
+        signs = true,
+        update_in_insert = false,
+      })
+
+      vim.keymap.set('n', '<leader>L', function()
+        lint.try_lint()
+      end, { desc = 'Trigger linting for current file' })
     end,
   },
 }

@@ -350,9 +350,10 @@ return {
     local dap = require 'dap'
     local dapui = require 'dapui'
 
-    vim.api.nvim_set_hl(0, 'DapStoppedLine', { default = true, link = 'Visual' })
-    vim.api.nvim_set_hl(0, 'DapStopped', { default = true, link = 'Visual', bg = '#F9E2AF', ctermbg = 0 })
-    -- vim.api.nvim_set_hl(0, 'DapStopped', { ctermbg = 0, bg = '#eee8d5' })
+    -- vim.api.nvim_set_hl(0, 'DapStoppedLine', { default = true, link = 'Visual' })
+    -- vim.api.nvim_set_hl(0, 'DapStopped', { link = 'Visual', bg = '#F9E2AF', ctermbg = 0 })
+    -- vim.api.nvim_set_hl(0, 'DapStopped', { default = true, link = 'Visual', bg = '#F9E2AF', ctermbg = 0 })
+    vim.api.nvim_set_hl(0, 'DapStopped', { ctermbg = 0, bg = '#F9E2AF' })
 
     for _, language in ipairs(js_languages) do
       dap.configurations[language] = {

@@ -92,6 +92,11 @@ vim.g.maplocalleader = ' '
 -- Set to true if you have a Nerd Font installed and selected in the terminal
 vim.g.have_nerd_font = true
 
+vim.opt.tabstop = 4
+vim.opt.shiftwidth = 4
+vim.opt.expandtab = true
+vim.opt.autoindent = true
+
 -- [[ Setting options ]]
 -- See `:help vim.opt`
 -- NOTE: You can change these options as you wish!
@@ -179,6 +184,51 @@ vim.api.nvim_create_autocmd({ 'BufEnter', 'CursorHold', 'CursorHoldI', 'FocusGai
 -- Clear highlights on search when pressing <Esc> in normal mode
 --  See `:help hlsearch`
 vim.keymap.set('n', '<Esc>', '<cmd>nohlsearch<CR>')
+
+vim.diagnostic.config {
+  virtual_text = false,
+  severity_sort = true,
+  signs = {
+    text = {
+      [vim.diagnostic.severity.ERROR] = '',
+      [vim.diagnostic.severity.WARN] = '',
+      [vim.diagnostic.severity.INFO] = '󰋼',
+      [vim.diagnostic.severity.HINT] = '󰌵',
+    },
+  },
+  float = {
+    border = 'rounded',
+    format = function(d)
+      return ('%s (%s) [%s]'):format(d.message, d.source, d.code or d.user_data.lsp.code)
+    end,
+  },
+  underline = true,
+  jump = {
+    float = true,
+  },
+}
+
+vim.api.nvim_create_autocmd({ 'CursorHold' }, {
+  pattern = '*',
+  callback = function()
+    for _, winid in pairs(vim.api.nvim_tabpage_list_wins(0)) do
+      if vim.api.nvim_win_get_config(winid).zindex then
+        return
+      end
+    end
+    vim.diagnostic.open_float {
+      scope = 'cursor',
+      focusable = false,
+      close_events = {
+        'CursorMoved',
+        'CursorMovedI',
+        'BufHidden',
+        'InsertCharPre',
+        'WinLeave',
+      },
+    }
+  end,
+})
 
 -- Diagnostic keymaps
 vim.keymap.set('n', '<leader>q', vim.diagnostic.setloclist, { desc = 'Open diagnostic [Q]uickfix list' })
@@ -585,7 +635,7 @@ require('lazy').setup({
   -- you do for a plugin at the top level, you can do for a dependency.
   --
   -- Use the `dependencies` key to specify the dependencies of a particular plugin
-
+  --
   { -- Fuzzy Finder (files, lsp, etc)
     'nvim-telescope/telescope.nvim',
     event = 'VimEnter',
@@ -716,7 +766,12 @@ require('lazy').setup({
       vim.keymap.set('n', '<leader>fd', builtin.diagnostics, { desc = '[S]earch [D]iagnostics' })
       vim.keymap.set('n', '<leader>sr', builtin.resume, { desc = '[S]earch [R]esume' })
       vim.keymap.set('n', '<leader>f.', builtin.oldfiles, { desc = '[S]earch Recent Files ("." for repeat)' })
-      vim.keymap.set('n', '<leader><leader>', builtin.buffers, { desc = '[ ] Find existing buffers' })
+      vim.keymap.set(
+        'n',
+        '<leader><leader>',
+        ":lua require('telescope').extensions.smart_open.smart_open { cwd_only = true }<CR>",
+        { desc = '[ ] Find existing buffers' }
+      )
 
       -- Slightly advanced example of overriding default behavior and theme
       vim.keymap.set('n', '<leader>/', function()
@@ -741,6 +796,21 @@ require('lazy').setup({
         builtin.find_files { cwd = vim.fn.stdpath 'config' }
       end, { desc = '[S]earch [N]eovim files' })
     end,
+  },
+  {
+    -- need to brew install sqlite
+    'danielfalk/smart-open.nvim',
+    branch = '0.2.x',
+    config = function()
+      require('telescope').load_extension 'smart_open'
+    end,
+    dependencies = {
+      'kkharji/sqlite.lua',
+      -- Only required if using match_algorithm fzf
+      { 'nvim-telescope/telescope-fzf-native.nvim', build = 'make' },
+      -- Optional.  If installed, native fzy will be used when match_algorithm is fzy
+      { 'nvim-telescope/telescope-fzy-native.nvim' },
+    },
   },
   {
     'abecodes/tabout.nvim',
@@ -805,6 +875,30 @@ require('lazy').setup({
     },
   },
   { 'Bilal2453/luvit-meta', lazy = true },
+  {
+    'David-Kunz/jester',
+    config = function()
+      require('jester').setup {
+        cmd = './node_modules/.bin/jest -- $file', -- run command
+        path_to_jest = './node_modules/.bin/jest', -- used for debugging
+        path_to_jest_run = './node_modules/.bin/jest', -- used to run tests
+        path_to_jest_debug = './node_modules/.bin/jest', -- used for debugging
+        terminal_cmd = ':vsplit | terminal',
+        dap = { -- debug adapter configuration
+          type = 'node2',
+          request = 'launch',
+          cwd = vim.fn.getcwd(),
+          runtimeArgs = { '--inspect-brk', '$path_to_jest', '--no-coverage', '-t', '$result', '--', '$file' },
+          args = { '--no-cache' },
+          sourceMaps = false,
+          protocol = 'inspector',
+          skipFiles = { '<node_internals>/**/*.js' },
+          port = 9229,
+          disableOptimisticBPs = true,
+        },
+      }
+    end,
+  },
   {
     -- Main LSP Configuration
     'neovim/nvim-lspconfig',
@@ -949,6 +1043,8 @@ require('lazy').setup({
       local capabilities = vim.lsp.protocol.make_client_capabilities()
       capabilities = vim.tbl_deep_extend('force', capabilities, require('cmp_nvim_lsp').default_capabilities())
 
+      local group = vim.api.nvim_create_augroup('lsp_format_on_save', { clear = false })
+
       require('lspconfig.configs').vtsls = require('vtsls').lspconfig
 
       -- Enable the following language servers
@@ -973,12 +1069,12 @@ require('lazy').setup({
         -- But for many setups, the LSP (`tsserver`) will work just fine
         --
         --
-        tsserver = {
-          enabled = false,
-        },
-        -- ts_ls = {
+        -- tsserver = {
         --   enabled = false,
         -- },
+        ts_ls = {
+          enabled = false,
+        },
         vtsls = {
           cmd = { 'vtsls', '--stdio' },
           filetypes = {
@@ -1051,23 +1147,55 @@ require('lazy').setup({
               },
             },
           },
-          on_attach = function(client, _)
+          on_attach = function(client, bufnr)
             client.server_capabilities.documentFormattingProvider = false
             client.server_capabilities.documentRangeFormattingProvider = false
-          end,
-        },
-        eslint = {
-          settings = {
-            workingDirectories = { mode = 'auto' },
-          },
-          ---@diagnostic disable-next-line: unused-local
-          on_attach = function(client, bufnr)
-            vim.api.nvim_create_autocmd('BufWritePre', {
-              pattern = { '*.tsx', '*.ts', '*.jsx', '*.js', '*.json' },
-              command = 'EslintFixAll',
+
+            local save_flag = false
+            local linter = require 'lint'
+
+            vim.api.nvim_clear_autocmds { buffer = bufnr, group = group }
+
+            vim.api.nvim_create_autocmd('BufWritePost', {
+              buffer = bufnr,
+              group = group,
+              callback = function()
+                if not save_flag then
+                  save_flag = true
+                  -- Fix ESLint errors:
+                  vim.cmd 'EslintFixAll'
+                  -- Format with Prettier:
+                  linter.try_lint()
+                  save_flag = false
+                end
+              end,
+              desc = '[lsp] format on save',
             })
+
+            --
+            -- vim.api.nvim_create_autocmd('BufWritePost', {
+            --   pattern = { '*.tsx', '*.ts', '*.jsx', '*.js', '*.json' },
+            --   callback = function()
+            --     vim.cmd 'EslintFixAll'
+            --     -- now row :e
+            --     vim.cmd 'e'
+            --   end,
+            -- })
           end,
         },
+        -- eslint = { -- enable if using eslint-lsp from Mason
+        --   settings = {
+        --     workingDirectories = { mode = 'auto' },
+        --   },
+        --   ---@diagnostic disable-next-line: unused-local
+        --   on_attach = function(client, bufnr)
+        --     vim.api.nvim_create_autocmd('BufWritePre', {
+        --       pattern = { '*.tsx', '*.ts', '*.jsx', '*.js', '*.json' },
+        --       command = 'EslintFixAll',
+        --     })
+        --   end,
+        -- },
+        eslint_d = {},
 
         lua_ls = {
           -- cmd = {...},
@@ -1546,11 +1674,12 @@ require('lazy').setup({
   --
   require 'kickstart.plugins.debug',
   require 'kickstart.plugins.indent_line',
-  -- require 'kickstart.plugins.lint',
+  require 'kickstart.plugins.lint',
   require 'kickstart.plugins.autopairs',
   require 'kickstart.plugins.neo-tree',
   require 'kickstart.plugins.gitsigns', -- adds gitsigns recommend keymaps
   require 'kickstart.plugins.lualine',
+  -- require 'kickstart.plugins.neotest',
 
   {
     'folke/trouble.nvim',
