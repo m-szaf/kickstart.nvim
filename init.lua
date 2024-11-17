@@ -1100,7 +1100,7 @@ require('lazy').setup({
             },
             typescript = {
               tsserver = {
-                maxTsServerMemory = 16384,
+                maxTsServerMemory = 8192,
                 -- experimental = { -- DOES WILD THINGS - walks dirs/spams errors, keep off
                 --   enableProjectDiagnostics = true,
                 -- },
@@ -1719,6 +1719,60 @@ require('lazy').setup({
     },
   },
   {
+    'yetone/avante.nvim',
+    event = 'VeryLazy',
+    lazy = false,
+    version = false, -- set this if you want to always pull the latest change
+    opts = {
+      -- add any opts here
+      provider = 'copilot',
+      -- copilot = {
+      --   endpoint = 'https://api.githubcopilot.com',
+      -- model = 'claude-3.5-sonnet',
+      --   proxy = nil, -- [protocol://]host[:port] Use this proxy
+      --   allow_insecure = false, -- Allow insecure server connections
+      --   timeout = 30000, -- Timeout in milliseconds
+      --   temperature = 0,
+      --   max_tokens = 4096,
+      -- },
+    },
+    -- if you want to build from source then do `make BUILD_FROM_SOURCE=true`
+    build = 'make',
+    -- build = "powershell -ExecutionPolicy Bypass -File Build.ps1 -BuildFromSource false" -- for windows
+    dependencies = {
+      'nvim-treesitter/nvim-treesitter',
+      'stevearc/dressing.nvim',
+      'nvim-lua/plenary.nvim',
+      'MunifTanjim/nui.nvim',
+      --- The below dependencies are optional,
+      'nvim-tree/nvim-web-devicons', -- or echasnovski/mini.icons
+      'zbirenbaum/copilot.lua', -- for providers='copilot'
+      {
+        -- support for image pasting
+        'HakonHarnes/img-clip.nvim',
+        event = 'VeryLazy',
+        opts = {
+          -- recommended settings
+          default = {
+            embed_image_as_base64 = false,
+            prompt_for_file_name = false,
+            drag_and_drop = {
+              insert_mode = true,
+            },
+          },
+        },
+      },
+      {
+        -- Make sure to set this up properly if you have lazy=true
+        'MeanderingProgrammer/render-markdown.nvim',
+        opts = {
+          file_types = { 'markdown', 'Avante' },
+        },
+        ft = { 'markdown', 'Avante' },
+      },
+    },
+  },
+  {
     'github/copilot.vim',
   },
   {
@@ -1730,12 +1784,13 @@ require('lazy').setup({
       { 'nvim-telescope/telescope.nvim' }, -- Use telescope for help actions
     },
     opts = {
-      debug = true, -- Enable debugging
+      debug = false, -- Enable debugging
       show_help = true, -- Show help actions
       window = {
         layout = 'float',
       },
       auto_follow_cursor = false, -- Don't follow the cursor after getting response
+      model = 'claude-3.5-sonnet',
     },
     config = function(_, opts)
       local chat = require 'CopilotChat'

@@ -19,12 +19,6 @@ return {
 
     local dap = require 'dap'
 
-    local pickers = require 'telescope.pickers'
-    local finders = require 'telescope.finders'
-    local conf = require('telescope.config').values
-    local actions = require 'telescope.actions'
-    local action_state = require 'telescope.actions.state'
-
     dap.adapters.node2 = {
       type = 'executable',
       command = 'node',
@@ -40,7 +34,7 @@ return {
 	    local ports = {}
 	    for line in result:gmatch("[^\r\n]+") do
 		    local pid, address = line:match("(%d+)%s+[%[%]*]*([%d%.%:]+)")
-		    local port = address:match(":(%d+)$")
+		    local port = address:match(":(%d%d%d%d)$")
 		    if pid and port then
 			    local cmd_handle = io.popen("ps -p " .. pid .. " -o args=")
 			    local cmd = cmd_handle:read("*a"):gsub("^%s*(.-)%s*$", "%1")
@@ -55,41 +49,43 @@ return {
     local function select_and_debug_node_process()
 	    local ports = get_node_inspection_ports()
 	    if #ports == 0 then
-		    print("No Node.js processes with inspection ports found.")
+		    print("No Node.js processes with active inspection ports found. (0000-9999)")
 		    return
 	    end
 
+	    local port_contexts = {
+            ["9290"] = "inbox-service",
+            ["9291"] = "inbox-processing-service",
+            ["9295"] = "inbox-outbound-push-service",
+		    ["9231"] = "monolith",
+            ["9277"] = "chat-service",
+            ["9475"] = "emoji-service",
+		    ["4444"] = "comment-service",
+	    }
+
 	    local choices = {}
 	    for i, entry in ipairs(ports) do
-		    table.insert(choices, string.format("%s : (%s)", entry.port, entry.cmd))
+		    local context = port_contexts[entry.port] and (" (" .. port_contexts[entry.port] .. ")") or ""
+		    table.insert(choices, string.format("Port: %s%s", entry.port, context))
 	    end
 
-	    pickers.new({}, {
-		    prompt_title = 'Select Node.js Process',
-		    finder = finders.new_table {
-			    results = choices,
-		    },
-		    sorter = conf.generic_sorter({}),
-		    attach_mappings = function(prompt_bufnr, map)
-			    actions.select_default:replace(function()
-				    actions.close(prompt_bufnr)
-				    local selection = action_state.get_selected_entry()
-				    local selected_port = ports[selection.index].port
-
-				    dap.run({
-					    type = 'node2',
-					    request = 'attach',
-					    name = 'Attach to Node.js process',
-					    port = tonumber(selected_port),
-					    cwd = '${workspaceFolder}',
-					    sourceMaps = true,
-					    protocol = 'inspector',
-					    restart = true,
-				    })
-			    end)
-			    return true
-		    end,
-	    }):find()
+	    vim.ui.select(choices, { prompt = 'Select Node.js Process' }, function(choice, idx)
+	        if choice then
+	            local selected_port = ports[idx].port
+	            dap.run({
+	                type = 'node2',
+	                request = 'attach',
+	                name = 'Attach to Node.js process',
+	                port = tonumber(selected_port),
+	                cwd = '${workspaceFolder}',
+	                sourceMaps = true,
+	                protocol = 'inspector',
+	                restart = true,
+	            })
+	        else
+	            print("No Node.js process selected.")
+	        end
+	    end)
     end
 
 
@@ -271,7 +267,7 @@ return {
 
       local dap_icons = {
         Stopped = { '󰁕 ', 'DiagnosticWarn', 'DapStoppedLine' },
-        Breakpoint = ' ',
+        Breakpoint = { ' ', 'DapBreakpointSymbol' },
         BreakpointCondition = ' ',
         BreakpointRejected = { ' ', 'DiagnosticError' },
         LogPoint = '.>',
@@ -293,6 +289,8 @@ return {
               {
                 id = 'stacks',
                 size = 0.3,
+                open = '<CR>',
+                expand = 'o',
               },
               {
                 id = 'breakpoints',
@@ -304,10 +302,14 @@ return {
               },
             },
             position = 'left',
-            size = 50,
+            size = 80,
           },
         },
       }
+
+      vim.api.nvim_set_hl(0, 'DapBreakpointSymbol', { default = true, fg = '#f38ba8' })
+      vim.api.nvim_set_hl(0, 'DapStoppedLine', { default = true, bg = '#3E3E3E', ctermbg = 0 })
+
       dap.listeners.after.event_initialized['dapui_config'] = function()
         vim.cmd.Neotree 'close'
         dapui.open {}
@@ -353,7 +355,10 @@ return {
     -- vim.api.nvim_set_hl(0, 'DapStoppedLine', { default = true, link = 'Visual' })
     -- vim.api.nvim_set_hl(0, 'DapStopped', { link = 'Visual', bg = '#F9E2AF', ctermbg = 0 })
     -- vim.api.nvim_set_hl(0, 'DapStopped', { default = true, link = 'Visual', bg = '#F9E2AF', ctermbg = 0 })
-    vim.api.nvim_set_hl(0, 'DapStopped', { ctermbg = 0, bg = '#F9E2AF' })
+    -- vim.api.nvim_set_hl(0, 'DapStopped', { bg = '#F9E2AF', ctermbg = 0 })
+    -- vim.api.nvim_set_hl(0, 'DapStopped', { text = '', texthl = 'DapStopped', linehl = 'DapStopped', numhl = 'DapStopped' })
+
+    -- vim.api.nvim_set_hl(0, 'DapStopped', { ctermbg = 0, bg = '#F9E2AF' })
 
     for _, language in ipairs(js_languages) do
       dap.configurations[language] = {
