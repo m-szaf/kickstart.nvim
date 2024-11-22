@@ -875,30 +875,30 @@ require('lazy').setup({
     },
   },
   { 'Bilal2453/luvit-meta', lazy = true },
-  {
-    'David-Kunz/jester',
-    config = function()
-      require('jester').setup {
-        cmd = './node_modules/.bin/jest -- $file', -- run command
-        path_to_jest = './node_modules/.bin/jest', -- used for debugging
-        path_to_jest_run = './node_modules/.bin/jest', -- used to run tests
-        path_to_jest_debug = './node_modules/.bin/jest', -- used for debugging
-        terminal_cmd = ':vsplit | terminal',
-        dap = { -- debug adapter configuration
-          type = 'node2',
-          request = 'launch',
-          cwd = vim.fn.getcwd(),
-          runtimeArgs = { '--inspect-brk', '$path_to_jest', '--no-coverage', '-t', '$result', '--', '$file' },
-          args = { '--no-cache' },
-          sourceMaps = false,
-          protocol = 'inspector',
-          skipFiles = { '<node_internals>/**/*.js' },
-          port = 9229,
-          disableOptimisticBPs = true,
-        },
-      }
-    end,
-  },
+  -- {
+  --   'David-Kunz/jester',
+  --   config = function()
+  --     require('jester').setup {
+  --       cmd = './node_modules/.bin/jest -- $file', -- run command
+  --       path_to_jest = './node_modules/.bin/jest', -- used for debugging
+  --       path_to_jest_run = './node_modules/.bin/jest', -- used to run tests
+  --       path_to_jest_debug = './node_modules/.bin/jest', -- used for debugging
+  --       terminal_cmd = ':vsplit | terminal',
+  --       dap = { -- debug adapter configuration
+  --         type = 'node2',
+  --         request = 'launch',
+  --         cwd = vim.fn.getcwd(),
+  --         runtimeArgs = { '--inspect-brk', '$path_to_jest', '--no-coverage', '-t', '$result', '--', '$file' },
+  --         args = { '--no-cache' },
+  --         sourceMaps = false,
+  --         protocol = 'inspector',
+  --         skipFiles = { '<node_internals>/**/*.js' },
+  --         port = 9229,
+  --         disableOptimisticBPs = true,
+  --       },
+  --     }
+  --   end,
+  -- },
   {
     -- Main LSP Configuration
     'neovim/nvim-lspconfig',
@@ -1100,7 +1100,7 @@ require('lazy').setup({
             },
             typescript = {
               tsserver = {
-                maxTsServerMemory = 8192,
+                maxTsServerMemory = 12288,
                 -- experimental = { -- DOES WILD THINGS - walks dirs/spams errors, keep off
                 --   enableProjectDiagnostics = true,
                 -- },
@@ -1546,6 +1546,13 @@ require('lazy').setup({
       --   `nvim-notify` is only needed, if you want to use the notification view.
       --   If not available, we use `mini` as the fallback
       'rcarriga/nvim-notify',
+    },
+    keys = {
+      {
+        '<Esc>',
+        '<cmd>Noice dismiss<CR>',
+        desc = 'Dismiss active noice messages',
+      },
     },
     config = function()
       require('noice').setup {

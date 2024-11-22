@@ -63,15 +63,30 @@ return {
 		    ["4444"] = "comment-service",
 	    }
 
-	    local choices = {}
+	    local known_ports = {}
+	    local unknown_ports = {}
 	    for i, entry in ipairs(ports) do
 		    local context = port_contexts[entry.port] and (" (" .. port_contexts[entry.port] .. ")") or ""
-		    table.insert(choices, string.format("Port: %s%s", entry.port, context))
+		    local choice = string.format("Port: %s%s", entry.port, context)
+		    if port_contexts[entry.port] then
+			    table.insert(known_ports, choice)
+		    else
+			    table.insert(unknown_ports, choice)
+		    end
+	    end
+	    local choices = {}
+	    local choice_to_port = {}
+	    for i, entry in ipairs(ports) do
+		    local context = port_contexts[entry.port] and (" (" .. port_contexts[entry.port] .. ")") or ""
+		    local choice = string.format("Port: %s%s", entry.port, context)
+		    table.insert(choices, choice)
+		    choice_to_port[choice] = entry.port
 	    end
 
 	    vim.ui.select(choices, { prompt = 'Select Node.js Process' }, function(choice, idx)
 	        if choice then
-	            local selected_port = ports[idx].port
+		    local selected_port = choice_to_port[choice]
+	            print("Selected port: " .. selected_port)
 	            dap.run({
 	                type = 'node2',
 	                request = 'attach',
